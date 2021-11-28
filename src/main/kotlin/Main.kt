@@ -1,4 +1,5 @@
 import kotlinx.coroutines.delay
+import top.wsure.guild.bot.component.EditRoles
 import top.wsure.guild.bot.official.OfficialBotClient
 import top.wsure.guild.bot.official.dtos.event.AtMessageCreateEvent
 import top.wsure.guild.bot.official.dtos.operation.IdentifyConfig
@@ -14,12 +15,19 @@ suspend fun main(args: Array<String>) {
     val botId = args.first()
     val botToken = args.last()
     val token = "Bot ${botId}.${botToken}"
-    OfficialBotClient(IdentifyConfig(token,4,0))
+
+    val editRole = EditRoles(token)
+
+    val listeners = listOf(
+        editRole
+    )
+
+    OfficialBotClient(IdentifyConfig(token,4,0), listeners)
     delay(3000L)
-    OfficialBotClient(IdentifyConfig(token,4,1))
+    OfficialBotClient(IdentifyConfig(token,4,1), listeners)
     delay(3000L)
-    OfficialBotClient(IdentifyConfig(token,4,2))
+    OfficialBotClient(IdentifyConfig(token,4,2), listeners)
     delay(3000L)
-    OfficialBotClient(IdentifyConfig(token,4,3))
+    OfficialBotClient(IdentifyConfig(token,4,3), listeners)
 
 }
