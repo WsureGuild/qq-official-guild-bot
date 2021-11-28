@@ -2,7 +2,19 @@ package top.wsure.guild.bot.official.dtos
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import top.wsure.guild.bot.utils.serializer.LocalDateTimeSerializer
+import java.time.LocalDateTime
 
+
+@Serializable
+data class User(
+    @SerialName("bot")
+    val bot: Boolean,
+    @SerialName("id")
+    val id: String,
+    @SerialName("username")
+    val username: String
+)
 
 @Serializable
 data class Author(
@@ -19,7 +31,8 @@ data class Author(
 @Serializable
 data class Member(
     @SerialName("joined_at")
-    val joinedAt: String? = null,
+    @Serializable( with = LocalDateTimeSerializer::class )
+    val joinedAt: LocalDateTime,
     @SerialName("roles")
-    val roles: List<String>? = null
+    val roles: List<String>
 )

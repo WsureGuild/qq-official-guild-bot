@@ -7,6 +7,8 @@ import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import top.wsure.guild.bot.common.BaseBotListener
 import top.wsure.guild.bot.official.dtos.event.AtMessageCreateEvent
+import top.wsure.guild.bot.official.dtos.event.ReadyEvent
+import top.wsure.guild.bot.official.dtos.event.guild.member.GuildMemberEvent
 import top.wsure.guild.bot.official.dtos.operation.*
 import top.wsure.guild.bot.official.enums.DispatchEnums
 import top.wsure.guild.bot.official.enums.OPCodeEnums
@@ -32,6 +34,8 @@ class OfficialBotListener(
 
     private val lastReceivedHeartBeat = AtomicLong(0)
 
+    private var session :String = ""
+
 
     override fun onOpen(webSocket: WebSocket, response: Response) {
         logger.info("onOpen ")
@@ -43,38 +47,69 @@ class OfficialBotListener(
             text.jsonToObjectOrNull<Operation>()?.also { opType ->
 
                 when(opType.type()){
-                    OPCodeEnums.Heartbeat_ACK -> {
+                    OPCodeEnums.HEARTBEAT_ACK -> {
                         lastReceivedHeartBeat.getAndSet(System.currentTimeMillis())
                     }
                     //首次连接 发送Identify信息鉴权
-                    OPCodeEnums.Heartbeat_Config -> {
+                    OPCodeEnums.HELLO -> {
                         // 初始化操作
                         initConnection(webSocket)
                     }
                     //收到事件
-                    OPCodeEnums.Dispatch -> {
+                    OPCodeEnums.DISPATCH -> {
                         text.jsonToObjectOrNull<Dispatch>()?.also { dispatchDto ->
                             messageCount.getAndSet(dispatchDto.seq)
                             logger.info("received Dispatch type:${dispatchDto.type} content:$text")
                             when(dispatchDto.type){
+                                DispatchEnums.READY -> {
+                                    text.jsonToObjectOrNull<ReadyEvent>()?.also { readyEvent ->
+                                        session = readyEvent.d.sessionId
+                                        officialEvents.forEach { runBlocking {
+                                            it.onReady(readyEvent)
+                                        }}
+                                    }
+                                }
+                                DispatchEnums.GUILD_MEMBER_ADD ->{
+                                    text.jsonToObjectOrNull<GuildMemberEvent>()?.also { guildMemberEvent ->
+                                        officialEvents.forEach { runBlocking {
+                                            it.onGuildMemberAdd(guildMemberEvent)
+                                        }}
+                                    }
+                                }
+                                DispatchEnums.GUILD_MEMBER_UPDATE -> {
+                                    text.jsonToObjectOrNull<GuildMemberEvent>()?.also { guildMemberEvent ->
+                                        officialEvents.forEach { runBlocking {
+                                            it.onGuildMemberUpdate(guildMemberEvent)
+                                        }}
+                                    }
+                                }
+                                DispatchEnums.GUILD_MEMBER_REMOVE ->{
+                                    text.jsonToObjectOrNull<GuildMemberEvent>()?.also { guildMemberEvent ->
+                                        officialEvents.forEach { runBlocking {
+                                            it.onGuildMemberRemove(guildMemberEvent)
+                                        }}
+                                    }
+                                }
                                 DispatchEnums.AT_MESSAGE_CREATE -> {
                                     text.jsonToObjectOrNull<AtMessageCreateEvent>()?.also { guildAtMessage ->
-
                                         officialEvents.forEach { runBlocking { it.onAtMessageCreate(guildAtMessage) } }
                                     }
+                                }
+                                else -> {
+                                    logger.warn("Unknown event ! message:$text")
                                 }
                             }
                         }
                     }
-                    OPCodeEnums.Reconnect -> {
+                    OPCodeEnums.RECONNECT -> {
                         logger.warn("need reconnect !!")
                         reconnectClient()
                     }
-                    OPCodeEnums.Invalid_Session -> {
+                    OPCodeEnums.INVALID_SESSION -> {
                         webSocket.cancel()
                         hbTimer?.cancel()
-                        logger.error(OPCodeEnums.Invalid_Session.description)
-                        throw RuntimeException(OPCodeEnums.Invalid_Session.description)
+                        logger.error(OPCodeEnums.INVALID_SESSION.description)
+                        throw RuntimeException(OPCodeEnums.INVALID_SESSION.description)
                     }
                 }
             }
@@ -119,9 +154,8 @@ class OfficialBotListener(
                 logger.warn("heartbeat timeout , try to reconnect")
                 reconnectClient()
             } else {
-                val hb = HeartbeatDto(messageCount.get()).objectToJson()
+                val hb = Heartbeat(messageCount.get()).objectToJson()
                 webSocket.sendAndPrintLog(hb,true)
-
             }
 
         }

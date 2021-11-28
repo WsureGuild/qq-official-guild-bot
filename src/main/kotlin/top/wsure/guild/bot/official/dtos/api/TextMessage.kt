@@ -9,5 +9,4 @@ data class TextMessage(
     val content:String,
     @SerialName("msg_id")
     val msgId:String,
-) {
-}
+)
