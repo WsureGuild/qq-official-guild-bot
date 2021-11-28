@@ -3,7 +3,8 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 plugins {
     kotlin("jvm") version "1.6.0"
     application
-    id("org.jetbrains.kotlin.plugin.serialization") version "1.6.0"
+//    id("org.jetbrains.kotlin.plugin.serialization") version "1.6.0"
+    kotlin("plugin.serialization") version "1.6.0"
 }
 
 group = "me.wsure"

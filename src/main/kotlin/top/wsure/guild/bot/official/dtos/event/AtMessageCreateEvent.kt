@@ -5,15 +5,11 @@ import kotlinx.serialization.Serializable
 import top.wsure.guild.bot.official.dtos.*
 import top.wsure.guild.bot.official.dtos.operation.Dispatch
 import top.wsure.guild.bot.official.enums.DispatchEnums
+import top.wsure.guild.bot.utils.serializer.LocalDateTimeSerializer
+import java.time.LocalDateTime
 
 @Serializable
 data class AtMessageCreateEvent(
-    @SerialName("d")
-    val d: AtMessageCreateData,
-): Dispatch(0, DispatchEnums.AT_MESSAGE_CREATE)
-
-@Serializable
-data class AtMessageCreateData(
     @SerialName("author")
     val author: Author,
     @SerialName("channel_id")
@@ -29,7 +25,8 @@ data class AtMessageCreateData(
     @SerialName("mentions")
     val mentions: List<Author>,
     @SerialName("timestamp")
-    val timestamp: String
+    @Serializable(with = LocalDateTimeSerializer::class)
+    val timestamp: LocalDateTime
 ){
     fun messageContent():String{
         return content.replace(Regex("<@!\\d+>"),"")

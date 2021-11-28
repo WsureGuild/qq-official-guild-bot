@@ -2,12 +2,13 @@ package top.wsure.guild.bot.official.dtos.operation
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
+import top.wsure.guild.bot.official.enums.OPCodeEnums
 
 
 @Serializable
 data class Resume(
     val d:ResumeData
-):Operation(6)
+):Operation(OPCodeEnums.RESUME)
 
 @Serializable
 data class ResumeData(

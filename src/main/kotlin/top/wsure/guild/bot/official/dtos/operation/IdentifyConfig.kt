@@ -5,9 +5,9 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class IdentifyConfig(
     val token: String,
-    val intents: Intents = Intents(),
     val shards: Int = 1,
-    val index: Int = 0,
+    var index: Int = 0,
+    val intents: Intents = Intents(),
     val properties: Properties = Properties()
 ) {
     fun toIdentifyOperationData(): IdentifyOperationData {

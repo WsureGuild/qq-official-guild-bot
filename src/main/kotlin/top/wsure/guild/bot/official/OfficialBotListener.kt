@@ -8,7 +8,9 @@ import org.slf4j.LoggerFactory
 import top.wsure.guild.bot.common.BaseBotListener
 import top.wsure.guild.bot.official.dtos.event.AtMessageCreateEvent
 import top.wsure.guild.bot.official.dtos.event.ReadyEvent
+import top.wsure.guild.bot.official.dtos.event.channel.ChannelEvent
 import top.wsure.guild.bot.official.dtos.event.guild.member.GuildMemberEvent
+import top.wsure.guild.bot.official.dtos.event.guilds.GuildEvent
 import top.wsure.guild.bot.official.dtos.operation.*
 import top.wsure.guild.bot.official.enums.DispatchEnums
 import top.wsure.guild.bot.official.enums.OPCodeEnums
@@ -17,36 +19,38 @@ import top.wsure.guild.bot.utils.JsonUtils.jsonToObjectOrNull
 import top.wsure.guild.bot.utils.JsonUtils.objectToJson
 import top.wsure.guild.bot.utils.ScheduleUtils
 import java.util.*
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 
 
 class OfficialBotListener(
-    config: IdentifyConfig,
+    private val config: IdentifyConfig,
     private val officialEvents:List<OfficialBotEvent> = emptyList(),
     private val heartbeatDelay: Long = 30000,
     private val reconnectTimeout: Long = 60000,
 ): BaseBotListener() {
-    private var hbTimer: Timer? = null
+    private val identifyOpDto = IdentifyOperation(config.toIdentifyOperationData()).objectToJson()
+    var sessionId :String = ""
 
     private val logger: Logger = LoggerFactory.getLogger(javaClass)
-    private val identifyOpDto = IdentifyOperation(config.toIdentifyOperationData()).objectToJson()
-    private val messageCount by lazy { AtomicLong(0) }
+    private val logHeader = "${config.index} of ${config.shards}"
 
+    private var hbTimer: Timer? = null
+    private val messageSeq by lazy { AtomicLong(0) }
     private val lastReceivedHeartBeat = AtomicLong(0)
-
-    private var session :String = ""
+    private val isResume = AtomicBoolean(false)
 
 
     override fun onOpen(webSocket: WebSocket, response: Response) {
-        logger.info("onOpen ")
+        logger.info("$logHeader onOpen ")
     }
 
     override fun onMessage(webSocket: WebSocket, text: String) {
         runCatching{
-            logger.debug("received message $text")
+            logger.trace("$logHeader received message $text")
             text.jsonToObjectOrNull<Operation>()?.also { opType ->
 
-                when(opType.type()){
+                when(opType.op){
                     OPCodeEnums.HEARTBEAT_ACK -> {
                         lastReceivedHeartBeat.getAndSet(System.currentTimeMillis())
                     }
@@ -57,59 +61,92 @@ class OfficialBotListener(
                     }
                     //收到事件
                     OPCodeEnums.DISPATCH -> {
-                        text.jsonToObjectOrNull<Dispatch>()?.also { dispatchDto ->
-                            messageCount.getAndSet(dispatchDto.seq)
-                            logger.info("received Dispatch type:${dispatchDto.type} content:$text")
+                        text.jsonToObjectOrNull<DispatchType>()?.also { dispatchDto ->
+                            successConnect(dispatchDto)
+                            logger.debug("$logHeader received Dispatch type:${dispatchDto.type} content:$text")
                             when(dispatchDto.type){
                                 DispatchEnums.READY -> {
-                                    text.jsonToObjectOrNull<ReadyEvent>()?.also { readyEvent ->
-                                        session = readyEvent.d.sessionId
+                                    text.jsonToObjectOrNull<Dispatch<ReadyEvent>>()?.also { readyEvent ->
+                                        sessionId = readyEvent.d.sessionId
                                         officialEvents.forEach { runBlocking {
-                                            it.onReady(readyEvent)
+                                            it.onReady(readyEvent.d)
                                         }}
                                     }
                                 }
                                 DispatchEnums.GUILD_MEMBER_ADD ->{
-                                    text.jsonToObjectOrNull<GuildMemberEvent>()?.also { guildMemberEvent ->
+                                    text.jsonToObjectOrNull<Dispatch<GuildMemberEvent>>()?.also { guildMemberEvent ->
                                         officialEvents.forEach { runBlocking {
-                                            it.onGuildMemberAdd(guildMemberEvent)
+                                            it.onGuildMemberAdd(guildMemberEvent.d)
                                         }}
                                     }
                                 }
                                 DispatchEnums.GUILD_MEMBER_UPDATE -> {
-                                    text.jsonToObjectOrNull<GuildMemberEvent>()?.also { guildMemberEvent ->
+                                    text.jsonToObjectOrNull<Dispatch<GuildMemberEvent>>()?.also { guildMemberEvent ->
                                         officialEvents.forEach { runBlocking {
-                                            it.onGuildMemberUpdate(guildMemberEvent)
+                                            it.onGuildMemberUpdate(guildMemberEvent.d)
                                         }}
                                     }
                                 }
                                 DispatchEnums.GUILD_MEMBER_REMOVE ->{
-                                    text.jsonToObjectOrNull<GuildMemberEvent>()?.also { guildMemberEvent ->
+                                    text.jsonToObjectOrNull<Dispatch<GuildMemberEvent>>()?.also { guildMemberEvent ->
                                         officialEvents.forEach { runBlocking {
-                                            it.onGuildMemberRemove(guildMemberEvent)
+                                            it.onGuildMemberRemove(guildMemberEvent.d)
                                         }}
                                     }
                                 }
                                 DispatchEnums.AT_MESSAGE_CREATE -> {
-                                    text.jsonToObjectOrNull<AtMessageCreateEvent>()?.also { guildAtMessage ->
-                                        officialEvents.forEach { runBlocking { it.onAtMessageCreate(guildAtMessage) } }
+                                    text.jsonToObjectOrNull<Dispatch<AtMessageCreateEvent>>()?.also { guildAtMessage ->
+                                        officialEvents.forEach { runBlocking { it.onAtMessageCreate(guildAtMessage.d) } }
                                     }
                                 }
+                                DispatchEnums.CHANNEL_CREATE -> {
+                                    text.jsonToObjectOrNull<Dispatch<ChannelEvent>>()?.also { channelEvent ->
+                                        officialEvents.forEach{ runBlocking { it.onChannelCreate(channelEvent.d) }}
+                                    }
+                                }
+                                DispatchEnums.CHANNEL_UPDATE -> {
+                                    text.jsonToObjectOrNull<Dispatch<ChannelEvent>>()?.also { channelEvent ->
+                                        officialEvents.forEach{ runBlocking { it.onChannelUpdate(channelEvent.d) }}
+                                    }
+                                }
+                                DispatchEnums.CHANNEL_DELETE -> {
+                                    text.jsonToObjectOrNull<Dispatch<ChannelEvent>>()?.also { channelEvent ->
+                                        officialEvents.forEach{ runBlocking { it.onChannelDelete(channelEvent.d) }}
+                                    }
+                                }
+                                DispatchEnums.GUILD_CREATE ->{
+                                    text.jsonToObjectOrNull<Dispatch<GuildEvent>>()?.also { guildEvent ->
+                                        officialEvents.forEach{ runBlocking { it.onGuildCreate(guildEvent.d) }}
+                                    }
+                                }
+                                DispatchEnums.GUILD_UPDATE ->{
+                                    text.jsonToObjectOrNull<Dispatch<GuildEvent>>()?.also { guildEvent ->
+                                        officialEvents.forEach{ runBlocking { it.onGuildUpdate(guildEvent.d) }}
+                                    }
+                                }
+                                DispatchEnums.GUILD_DELETE ->{
+                                    text.jsonToObjectOrNull<Dispatch<GuildEvent>>()?.also { guildEvent ->
+                                        officialEvents.forEach{ runBlocking { it.onGuildDelete(guildEvent.d) }}
+                                    }
+                                }
+                                DispatchEnums.RESUMED -> {
+                                    officialEvents.forEach { runBlocking { it.onResumed(config,sessionId) } }
+                                }
                                 else -> {
-                                    logger.warn("Unknown event ! message:$text")
+                                    logger.warn("$logHeader Unknown event ! message:$text")
                                 }
                             }
                         }
                     }
                     OPCodeEnums.RECONNECT -> {
-                        logger.warn("need reconnect !!")
+                        logger.warn("$logHeader need reconnect !!")
+                        isResume.getAndSet(true)
                         reconnectClient()
                     }
                     OPCodeEnums.INVALID_SESSION -> {
-                        webSocket.cancel()
-                        hbTimer?.cancel()
-                        logger.error(OPCodeEnums.INVALID_SESSION.description)
-                        throw RuntimeException(OPCodeEnums.INVALID_SESSION.description)
+                        logger.error("$logHeader error:",OPCodeEnums.INVALID_SESSION.description)
+                        failureConnect(webSocket)
+
                     }
                 }
             }
@@ -118,25 +155,43 @@ class OfficialBotListener(
         }
     }
 
+    private fun failureConnect(webSocket: WebSocket) {
+        if(isResume.get()){
+            isResume.set(false)
+            reconnectClient()
+        } else {
+            webSocket.cancel()
+            hbTimer?.cancel()
+            throw RuntimeException(OPCodeEnums.INVALID_SESSION.description)
+        }
+    }
+
+    private fun successConnect(dispatchDto: DispatchType) {
+        messageSeq.getAndSet(dispatchDto.seq)
+        isResume.set(false)
+    }
+
     override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
-        logger.warn("onClosing try to reconnect")
+        logger.warn("$logHeader onClosing")
     }
 
     override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+        logger.warn("$logHeader onClosed")
     }
 
     override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-        logger.warn("onFailure try to reconnect")
+        logger.warn("$logHeader onFailure try to reconnect")
         reconnectClient()
-    }
-
-    fun WebSocket.logInfo():String{
-        return "${this.request().url} - ${this.request().body.toString()}"
     }
 
     private fun initConnection(webSocket: WebSocket){
         // 鉴权
-        webSocket.sendAndPrintLog(identifyOpDto)
+        if(isResume.get()){
+            val resume = Resume(ResumeData(messageSeq.get(),sessionId,config.token))
+            webSocket.sendAndPrintLog(resume.objectToJson())
+        } else {
+            webSocket.sendAndPrintLog(identifyOpDto)
+        }
         // 启动心跳发送
         lastReceivedHeartBeat.getAndSet(System.currentTimeMillis())
         val processor = createHeartBeatProcessor(webSocket)
@@ -151,13 +206,12 @@ class OfficialBotListener(
             val last = lastReceivedHeartBeat.get()
             val now = System.currentTimeMillis()
             if( now - last > reconnectTimeout){
-                logger.warn("heartbeat timeout , try to reconnect")
+                logger.warn("$logHeader heartbeat timeout , try to reconnect")
                 reconnectClient()
             } else {
-                val hb = Heartbeat(messageCount.get()).objectToJson()
+                val hb = Heartbeat(messageSeq.get()).objectToJson()
                 webSocket.sendAndPrintLog(hb,true)
             }
-
         }
     }
 
@@ -168,9 +222,9 @@ class OfficialBotListener(
 
     private fun WebSocket.sendAndPrintLog(text: String, isHeartbeat:Boolean = false){
         if(isHeartbeat){
-            logger.debug("send Heartbeat $text")
+            logger.debug("$logHeader send Heartbeat $text")
         } else {
-            logger.info("send text message $text")
+            logger.info("$logHeader send text message $text")
         }
         this.send(text)
     }

@@ -24,8 +24,8 @@ object OfficialBotApi {
     }
 
     fun AtMessageCreateEvent.reply(botName: String, msg: String): Boolean {
-        val url = sendMessage.replace("{{channel_id}}", this.d.channelId)
-        val json = TextMessage(msg, this.d.id).objectToJson()
+        val url = sendMessage.replace("{{channel_id}}", this.channelId)
+        val json = TextMessage(msg, this.id).objectToJson()
         val header = officeApiHeader(botName)
         val res = OkHttpUtils.postJson(url, OkHttpUtils.addJson(json), header)
         logger.info("reply msg:$msg url:$url res: $res")

@@ -1,7 +1,13 @@
 package top.wsure.guild.bot.official.enums
 
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 
 /*
 CODE	名称	客户端操作	描述
@@ -43,5 +49,17 @@ enum class OPCodeEnums(
         fun getOPCodeByCode(code: Int): OPCodeEnums {
             return codeMap[code]?: UNKNOWN
         }
+    }
+    object OperationKSerializer : KSerializer<OPCodeEnums>{
+        override fun deserialize(decoder: Decoder): OPCodeEnums {
+            return getOPCodeByCode(decoder.decodeInt())
+        }
+
+        override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("OPCodeEnums", PrimitiveKind.INT)
+
+        override fun serialize(encoder: Encoder, value: OPCodeEnums) {
+            encoder.encodeInt(value.code)
+        }
+
     }
 }

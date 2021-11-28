@@ -2,12 +2,13 @@ package top.wsure.guild.bot.official.dtos.operation
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import top.wsure.guild.bot.official.enums.OPCodeEnums
 
 @Serializable
 class IdentifyOperation(
     @SerialName("d")
     val d: IdentifyOperationData,
-) : Operation(op = 2) {
+) : Operation(OPCodeEnums.IDENTIFY) {
     constructor(token: String) : this(IdentifyOperationData(token = token))
 }
 

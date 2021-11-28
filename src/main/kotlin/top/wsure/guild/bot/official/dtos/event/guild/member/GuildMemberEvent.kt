@@ -3,7 +3,8 @@ import kotlinx.serialization.Serializable
 
 import kotlinx.serialization.SerialName
 import top.wsure.guild.bot.official.dtos.User
-
+import top.wsure.guild.bot.official.dtos.operation.Dispatch
+import top.wsure.guild.bot.official.enums.DispatchEnums
 
 @Serializable
 data class GuildMemberEvent(

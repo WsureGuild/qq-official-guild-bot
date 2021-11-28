@@ -1,11 +1,11 @@
-package top.wsure.guild.bot.official.dtos.event
+package top.wsure.guild.bot.official.dtos.event.guilds
+import kotlinx.serialization.Serializable
 
 import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
 
 
 @Serializable
-data class GuildUpdate(
+data class GuildEvent(
     @SerialName("description")
     val description: String,
     @SerialName("icon")
