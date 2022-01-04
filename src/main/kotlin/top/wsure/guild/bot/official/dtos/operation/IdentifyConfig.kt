@@ -24,16 +24,22 @@ data class IdentifyConfig(
 data class Intents(
     val guilds: Boolean = true,
     val guildMembers: Boolean = true,
+    val messageCreate : Boolean = true,
+    val guildMessageReactions : Boolean = true,
     val directMessage: Boolean = false,
+    val forumEvent : Boolean = false,
     val audioAction: Boolean = true,
     val atMessages: Boolean = true,
 ) {
     fun toIntentsValue(): Long {
         return ((if (guilds) 1.shl(0) else 0)
-                + (if (guildMembers) 1.shl(1) else 0)
-                + (if (directMessage) 1.shl(12) else 0)
-                + (if (audioAction) 1.shl(29) else 0)
-                + (if (atMessages) 1.shl(30) else 0))
+            .or(if (guildMembers) 1.shl(1) else 0)
+            .or(if (messageCreate) 1.shl(9) else 0)
+            .or(if (guildMessageReactions) 1.shl(10) else 0)
+            .or(if (directMessage) 1.shl(12) else 0)
+            .or(if (forumEvent) 1.shl(28) else 0)
+            .or(if (audioAction) 1.shl(29) else 0)
+            .or(if (atMessages) 1.shl(30) else 0))
             .toLong()
     }
 }

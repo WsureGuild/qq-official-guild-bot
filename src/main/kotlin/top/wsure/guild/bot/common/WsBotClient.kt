@@ -36,6 +36,13 @@ open class WsBotClient<T: BaseBotListener>(
         connectWebSocket = wsClient.newWebSocket(wsRequest,listener)
     }
 
+    override fun connected() {
+
+    }
+
+    override fun disconnect() {
+    }
+
     override fun sendMessage(text: String){
         logger.info("send text message $text")
         connectWebSocket.send(text)

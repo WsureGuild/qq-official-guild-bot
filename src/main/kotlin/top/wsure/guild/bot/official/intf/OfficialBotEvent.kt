@@ -1,6 +1,7 @@
 package top.wsure.guild.bot.official.intf
 
 import top.wsure.guild.bot.official.dtos.event.AtMessageCreateEvent
+import top.wsure.guild.bot.official.dtos.event.MessageCreate
 import top.wsure.guild.bot.official.dtos.event.ReadyEvent
 import top.wsure.guild.bot.official.dtos.event.channel.ChannelEvent
 import top.wsure.guild.bot.official.dtos.event.guild.member.GuildMemberEvent
@@ -31,6 +32,8 @@ abstract class OfficialBotEvent {
     open suspend fun onGuildDelete(data: GuildEvent) {}
 
     open suspend fun onResumed(config: IdentifyConfig, sessionId: String) {}
+
+    open suspend fun onMessageCreate(data: MessageCreate) {}
 
     //TODO 官方有许多事件，后续在这里添加事件名称
 

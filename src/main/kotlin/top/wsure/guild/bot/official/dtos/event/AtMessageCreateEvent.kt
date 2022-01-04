@@ -2,9 +2,8 @@ package top.wsure.guild.bot.official.dtos.event
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import top.wsure.guild.bot.official.dtos.*
-import top.wsure.guild.bot.official.dtos.operation.Dispatch
-import top.wsure.guild.bot.official.enums.DispatchEnums
+import top.wsure.guild.bot.official.dtos.Author
+import top.wsure.guild.bot.official.dtos.Member
 import top.wsure.guild.bot.utils.serializer.LocalDateTimeSerializer
 import java.time.LocalDateTime
 

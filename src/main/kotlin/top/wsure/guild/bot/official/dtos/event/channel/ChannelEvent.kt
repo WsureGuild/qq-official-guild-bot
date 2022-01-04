@@ -1,7 +1,7 @@
 package top.wsure.guild.bot.official.dtos.event.channel
-import kotlinx.serialization.Serializable
 
 import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
 
 @Serializable

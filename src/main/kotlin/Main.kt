@@ -1,12 +1,7 @@
 import kotlinx.coroutines.delay
 import top.wsure.guild.bot.component.EditRoles
-import top.wsure.guild.bot.official.OfficialBotClient
-import top.wsure.guild.bot.official.dtos.event.AtMessageCreateEvent
+import top.wsure.guild.bot.official.OfficialClient
 import top.wsure.guild.bot.official.dtos.operation.IdentifyConfig
-import top.wsure.guild.bot.utils.JsonUtils.jsonToObject
-import java.time.LocalDateTime
-import java.time.ZonedDateTime
-import java.time.format.DateTimeFormatter
 
 suspend fun main(args: Array<String>) {
 
@@ -22,12 +17,13 @@ suspend fun main(args: Array<String>) {
         editRole
     )
 
-    OfficialBotClient(IdentifyConfig(token,4,0), listeners)
+    OfficialClient(IdentifyConfig(token,4,0), listeners)
     delay(3000L)
-    OfficialBotClient(IdentifyConfig(token,4,1), listeners)
+    OfficialClient(IdentifyConfig(token,4,1), listeners)
     delay(3000L)
-    OfficialBotClient(IdentifyConfig(token,4,2), listeners)
+    OfficialClient(IdentifyConfig(token,4,2), listeners)
     delay(3000L)
-    OfficialBotClient(IdentifyConfig(token,4,3), listeners)
+    OfficialClient(IdentifyConfig(token,4,3), listeners)
 
+//    OfficialClient(IdentifyConfig(token,1,0), listeners)
 }

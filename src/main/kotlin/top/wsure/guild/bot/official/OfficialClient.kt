@@ -1,0 +1,267 @@
+package top.wsure.guild.bot.official
+
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
+import okhttp3.Response
+import okhttp3.WebSocket
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
+import top.wsure.guild.bot.common.WebsocketClient
+import top.wsure.guild.bot.official.dtos.event.AtMessageCreateEvent
+import top.wsure.guild.bot.official.dtos.event.MessageCreate
+import top.wsure.guild.bot.official.dtos.event.ReadyEvent
+import top.wsure.guild.bot.official.dtos.event.channel.ChannelEvent
+import top.wsure.guild.bot.official.dtos.event.guild.member.GuildMemberEvent
+import top.wsure.guild.bot.official.dtos.event.guilds.GuildEvent
+import top.wsure.guild.bot.official.dtos.operation.*
+import top.wsure.guild.bot.official.enums.DispatchEnums
+import top.wsure.guild.bot.official.enums.OPCodeEnums
+import top.wsure.guild.bot.official.intf.OfficialBotEvent
+import top.wsure.guild.bot.utils.FileUtils
+import top.wsure.guild.bot.utils.JsonUtils.jsonToObject
+import top.wsure.guild.bot.utils.JsonUtils.jsonToObjectOrNull
+import top.wsure.guild.bot.utils.JsonUtils.objectToJson
+import top.wsure.guild.bot.utils.ScheduleUtils
+import java.util.*
+import java.util.concurrent.atomic.AtomicLong
+import kotlin.io.path.Path
+
+class OfficialClient(
+    private val config: IdentifyConfig,
+    private val officialEvents:List<OfficialBotEvent> = emptyList(),
+    private val heartbeatDelay: Long = 30000,
+    private val reconnectTimeout: Long = 60000,
+    wsUrl :String = "wss://api.sgroup.qq.com/websocket",
+    retryWait:Long = 3000,
+    seqPath: String = "seq/official/"
+):WebsocketClient(wsUrl, retryWait) {
+    private val logger: Logger = LoggerFactory.getLogger(javaClass)
+
+    private val identifyOpDto = IdentifyOperation(config.toIdentifyOperationData()).objectToJson()
+    var sessionId :String = ""
+    var resetSession :Boolean = false
+    private val logHeader = "${config.index} of ${config.shards}"
+
+    private var hbTimer: Timer? = null
+    private val messageSeq by lazy { AtomicLong(0) }
+    private val lastReceivedHeartBeat = AtomicLong(0)
+    private val seqFile = Path("$seqPath${FileUtils.md5(config.token)}_${config.shards}_${config.index}").toFile()
+
+    init {
+        Path(seqPath).toFile().mkdirs()
+        if(seqFile.exists()){
+            try {
+                val cacheResumeData = seqFile.readText().jsonToObject<ResumeData>()
+                messageSeq.getAndSet(cacheResumeData.seq)
+                sessionId = cacheResumeData.sessionId
+            }catch (e:Exception){
+                logger.warn("read seqFile fail",e)
+            }
+        } else {
+            seqFile.createNewFile()
+        }
+    }
+
+    override fun onOpen(webSocket: WebSocket, response: Response) {
+        logger.info("$logHeader onOpen ")
+    }
+
+    @OptIn(DelicateCoroutinesApi::class)
+    override fun onMessage(webSocket: WebSocket, text: String) {
+        runCatching{
+            logger.trace("$logHeader received message $text")
+            text.jsonToObjectOrNull<Operation>()?.also { opType ->
+
+                when(opType.op){
+                    OPCodeEnums.HEARTBEAT_ACK -> {
+                        lastReceivedHeartBeat.getAndSet(System.currentTimeMillis())
+                    }
+                    //首次连接 发送Identify信息鉴权
+                    OPCodeEnums.HELLO -> {
+                        // 初始化操作
+                        logger.debug("$logHeader received HELLO , content:$text")
+                        initConnection(webSocket)
+                    }
+                    //收到事件
+                    OPCodeEnums.DISPATCH -> {
+                        text.jsonToObjectOrNull<DispatchType>()?.also { dispatchDto ->
+
+                            logger.debug("$logHeader received Dispatch type:${dispatchDto.type} content:$text")
+                            when (dispatchDto.type) {
+                                DispatchEnums.READY -> {
+                                    text.jsonToObjectOrNull<Dispatch<ReadyEvent>>()?.also { readyEvent ->
+                                        sessionId = readyEvent.d.sessionId
+                                        resetSession = false
+                                        GlobalScope.launch { officialEvents.forEach {
+                                            it.onReady(readyEvent.d)
+                                        } }
+                                    }
+                                }
+                                DispatchEnums.GUILD_MEMBER_ADD -> {
+                                    text.jsonToObjectOrNull<Dispatch<GuildMemberEvent>>()?.also { guildMemberEvent ->
+                                        GlobalScope.launch { officialEvents.forEach {
+                                            it.onGuildMemberAdd(guildMemberEvent.d)
+                                        } }
+                                    }
+                                }
+                                DispatchEnums.GUILD_MEMBER_UPDATE -> {
+                                    text.jsonToObjectOrNull<Dispatch<GuildMemberEvent>>()?.also { guildMemberEvent ->
+                                        GlobalScope.launch { officialEvents.forEach {
+                                            it.onGuildMemberUpdate(guildMemberEvent.d)
+                                        } }
+                                    }
+                                }
+                                DispatchEnums.GUILD_MEMBER_REMOVE -> {
+                                    text.jsonToObjectOrNull<Dispatch<GuildMemberEvent>>()?.also { guildMemberEvent ->
+                                        GlobalScope.launch { officialEvents.forEach {
+                                            it.onGuildMemberRemove(guildMemberEvent.d)
+                                        } }
+                                    }
+                                }
+                                DispatchEnums.AT_MESSAGE_CREATE -> {
+                                    text.jsonToObjectOrNull<Dispatch<AtMessageCreateEvent>>()?.also { guildAtMessage ->
+                                        GlobalScope.launch { officialEvents.forEach { it.onAtMessageCreate(guildAtMessage.d) } }
+                                    }
+                                }
+                                DispatchEnums.MESSAGE_CREATE -> {
+                                    text.jsonToObjectOrNull<Dispatch<MessageCreate>>()?.also { messageCreate ->
+                                        GlobalScope.launch { officialEvents.forEach { it.onMessageCreate(messageCreate.d) } }
+                                    }
+                                }
+                                DispatchEnums.CHANNEL_CREATE -> {
+                                    text.jsonToObjectOrNull<Dispatch<ChannelEvent>>()?.also { channelEvent ->
+                                        GlobalScope.launch { officialEvents.forEach{ it.onChannelCreate(channelEvent.d) } }
+                                    }
+                                }
+                                DispatchEnums.CHANNEL_UPDATE -> {
+                                    text.jsonToObjectOrNull<Dispatch<ChannelEvent>>()?.also { channelEvent ->
+                                        GlobalScope.launch { officialEvents.forEach{ it.onChannelUpdate(channelEvent.d) } }
+                                    }
+                                }
+                                DispatchEnums.CHANNEL_DELETE -> {
+                                    text.jsonToObjectOrNull<Dispatch<ChannelEvent>>()?.also { channelEvent ->
+                                        GlobalScope.launch { officialEvents.forEach{ it.onChannelDelete(channelEvent.d) } }
+                                    }
+                                }
+                                DispatchEnums.GUILD_CREATE ->{
+                                    text.jsonToObjectOrNull<Dispatch<GuildEvent>>()?.also { guildEvent ->
+                                        GlobalScope.launch { officialEvents.forEach{ it.onGuildCreate(guildEvent.d) } }
+                                    }
+                                }
+                                DispatchEnums.GUILD_UPDATE ->{
+                                    text.jsonToObjectOrNull<Dispatch<GuildEvent>>()?.also { guildEvent ->
+                                        GlobalScope.launch { officialEvents.forEach{ it.onGuildUpdate(guildEvent.d) } }
+                                    }
+                                }
+                                DispatchEnums.GUILD_DELETE ->{
+                                    text.jsonToObjectOrNull<Dispatch<GuildEvent>>()?.also { guildEvent ->
+                                        GlobalScope.launch { officialEvents.forEach{ it.onGuildDelete(guildEvent.d) } }
+                                    }
+                                }
+                                DispatchEnums.RESUMED -> {
+                                    GlobalScope.launch { officialEvents.forEach { it.onResumed(config,sessionId) } }
+                                }
+                                else -> {
+                                    logger.warn("$logHeader Unknown event ! message:$text")
+                                }
+                            }
+                            //先处理消息再处理seq
+                            onReceivedMsg(dispatchDto)
+                        }
+                    }
+                    OPCodeEnums.RECONNECT -> {
+                        logger.warn("$logHeader need reconnect !!")
+                        reconnectClient()
+                    }
+                    OPCodeEnums.INVALID_SESSION -> {
+                        logger.error("$logHeader error:", OPCodeEnums.INVALID_SESSION.description)
+                        failureConnect()
+                    }
+                    else -> {
+                        logger.warn("$logHeader Unknown opcode ! message:$text")
+                    }
+                }
+            }
+        }.onFailure {
+            it.printStackTrace()
+        }
+    }
+
+    private fun failureConnect() {
+        if(!resetSession){
+            resetSession = true
+            reconnectClient()
+        } else {
+            disconnect()
+            hbTimer?.cancel()
+            throw RuntimeException(OPCodeEnums.INVALID_SESSION.description)
+        }
+    }
+
+    private fun onReceivedMsg(dispatchDto: DispatchType) {
+        seqFile.writeText(ResumeData(dispatchDto.seq,sessionId,config.token).objectToJson())
+        messageSeq.getAndSet(dispatchDto.seq)
+    }
+
+    override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
+        logger.warn("$logHeader onClosing")
+    }
+
+    override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+        logger.warn("$logHeader onClosed")
+        reconnect()
+    }
+
+    override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+        logger.warn("$logHeader onFailure try to reconnect")
+        reconnectClient()
+    }
+
+    private fun initConnection(webSocket: WebSocket){
+        connected()
+        // 鉴权
+        if(resetSession){
+            val resume = Resume(ResumeData(messageSeq.get(),sessionId,config.token))
+            webSocket.sendAndPrintLog(resume.objectToJson())
+        } else {
+            webSocket.sendAndPrintLog(identifyOpDto)
+        }
+
+        // 启动心跳发送
+        lastReceivedHeartBeat.getAndSet(System.currentTimeMillis())
+        val processor = createHeartBeatProcessor(webSocket)
+        //  先取消以前的定时器
+        hbTimer?.cancel()
+        // 启动新的心跳
+        hbTimer = ScheduleUtils.loopEvent(processor, Date(),heartbeatDelay)
+    }
+
+    private fun createHeartBeatProcessor(webSocket: WebSocket):suspend () ->Unit {
+        return suspend {
+            val last = lastReceivedHeartBeat.get()
+            val now = System.currentTimeMillis()
+            if( now - last > reconnectTimeout){
+                logger.warn("$logHeader heartbeat timeout , try to reconnect")
+                reconnectClient()
+            } else {
+                val hb = Heartbeat(messageSeq.get()).objectToJson()
+                webSocket.sendAndPrintLog(hb,true)
+            }
+        }
+    }
+
+    private fun reconnectClient(){
+        hbTimer?.cancel()
+        reconnect()
+    }
+
+    private fun WebSocket.sendAndPrintLog(text: String, isHeartbeat:Boolean = false){
+        if(isHeartbeat){
+            logger.debug("$logHeader send Heartbeat $text")
+        } else {
+            logger.info("$logHeader send text message $text")
+        }
+        this.send(text)
+    }
+}

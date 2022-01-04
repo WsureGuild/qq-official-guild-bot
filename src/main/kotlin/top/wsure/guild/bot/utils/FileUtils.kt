@@ -1,9 +1,11 @@
 package top.wsure.guild.bot.utils
 
-import top.wsure.guild.bot.utils.JsonUtils.jsonToObject
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import top.wsure.guild.bot.utils.JsonUtils.jsonToObject
 import java.io.File
+import java.math.BigInteger
+import java.security.MessageDigest
 
 object FileUtils {
     val logger: Logger = LoggerFactory.getLogger(javaClass)
@@ -19,5 +21,16 @@ object FileUtils {
             .onFailure {
                 logger.warn("Read file {} by File method failure !!", this, it)
             }.getOrNull()
+    }
+    fun createFileAndDirectory(file:File){
+        if(file.isDirectory) file.mkdirs()
+        else if(!file.parentFile.exists()){
+            file.parentFile.mkdirs()
+        }
+    }
+
+    fun md5(input:String): String {
+        val md = MessageDigest.getInstance("MD5")
+        return BigInteger(1, md.digest(input.toByteArray())).toString(16).padStart(32, '0')
     }
 }
