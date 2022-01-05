@@ -6,7 +6,7 @@ import org.slf4j.LoggerFactory
 import top.wsure.guild.bot.official.dtos.OfficialCode.messageContent
 import top.wsure.guild.bot.official.dtos.event.AtMessageCreateEvent
 import top.wsure.guild.bot.official.intf.OfficialBotEvent
-import top.wsure.guild.bot.utils.ac.AhoCorasickMatcher
+import top.wsure.guild.common.utils.ac.AhoCorasickMatcher
 
 class EditRoles: OfficialBotEvent() {
     private val logger: Logger = LoggerFactory.getLogger(javaClass)

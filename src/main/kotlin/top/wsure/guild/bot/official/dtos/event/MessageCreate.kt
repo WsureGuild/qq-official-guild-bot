@@ -1,7 +1,7 @@
 package top.wsure.guild.bot.official.dtos.event
-import kotlinx.serialization.Serializable
 
 import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import top.wsure.guild.bot.official.dtos.Author
 import top.wsure.guild.bot.official.dtos.Member
 

@@ -5,10 +5,9 @@ import org.slf4j.LoggerFactory
 import top.wsure.guild.bot.official.dtos.api.Role
 import top.wsure.guild.bot.official.dtos.api.RolesApiRes
 import top.wsure.guild.bot.official.dtos.api.TextMessage
-import top.wsure.guild.bot.official.dtos.event.AtMessageCreateEvent
-import top.wsure.guild.bot.utils.JsonUtils.jsonToObjectOrNull
-import top.wsure.guild.bot.utils.JsonUtils.objectToJson
-import top.wsure.guild.bot.utils.OkHttpUtils
+import top.wsure.guild.common.utils.JsonUtils.jsonToObjectOrNull
+import top.wsure.guild.common.utils.JsonUtils.objectToJson
+import top.wsure.guild.common.utils.OkHttpUtils
 
 class OfficialBotApi(private val token: String) {
     private val logger: Logger = LoggerFactory.getLogger(javaClass)

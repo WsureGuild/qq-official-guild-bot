@@ -3,8 +3,8 @@ package top.wsure.guild.bot.official.dtos.event
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import top.wsure.guild.bot.official.dtos.Author
+import top.wsure.guild.bot.official.dtos.LocalDateTimeSerializer
 import top.wsure.guild.bot.official.dtos.Member
-import top.wsure.guild.bot.utils.serializer.LocalDateTimeSerializer
 import java.time.LocalDateTime
 
 @Serializable
