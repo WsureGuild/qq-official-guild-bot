@@ -10,49 +10,49 @@ import top.wsure.guild.bot.utils.JsonUtils.jsonToObjectOrNull
 import top.wsure.guild.bot.utils.JsonUtils.objectToJson
 import top.wsure.guild.bot.utils.OkHttpUtils
 
-object OfficialBotApi {
+class OfficialBotApi(private val token: String) {
     private val logger: Logger = LoggerFactory.getLogger(javaClass)
 
-    private const val roles = "https://api.sgroup.qq.com/guilds/{{guild_id}}/roles"
-    private const val editRole = "https://api.sgroup.qq.com/guilds/{{guild_id}}/members/{{user_id}}/roles/{{role_id}}"
-    private const val sendMessage = "https://api.sgroup.qq.com/channels/{{channel_id}}/messages"
+    private val roles = "https://api.sgroup.qq.com/guilds/{{guild_id}}/roles"
+    private val editRole = "https://api.sgroup.qq.com/guilds/{{guild_id}}/members/{{user_id}}/roles/{{role_id}}"
+    private val sendMessage = "https://api.sgroup.qq.com/channels/{{channel_id}}/messages"
 
-    private fun officeApiHeader(token: String): MutableMap<String, String> {
+    private fun officeApiHeader(): MutableMap<String, String> {
         return mutableMapOf(
             "Authorization" to token
         )
     }
 
-    fun AtMessageCreateEvent.reply(token: String, msg: String): Boolean {
-        val url = sendMessage.replace("{{channel_id}}", this.channelId)
-        val json = TextMessage(msg, this.id).objectToJson()
-        val header = officeApiHeader(token)
+    fun reply(channelId:String,id:String, msg: String): Boolean {
+        val url = sendMessage.replace("{{channel_id}}", channelId)
+        val json = TextMessage(msg, id).objectToJson()
+        val header = officeApiHeader()
         val res = OkHttpUtils.postJson(url, OkHttpUtils.addJson(json), header)
         logger.info("reply msg:$msg url:$url res: $res")
         return true
     }
 
-    fun getRoles(token: String, guildId: String): List<Role> {
+    fun getRoles(guildId: String): List<Role> {
         val url = roles.replace("{{guild_id}}", guildId)
-        val rolesApiRes = OkHttpUtils.getJson(url, officeApiHeader(token)).jsonToObjectOrNull<RolesApiRes>()
+        val rolesApiRes = OkHttpUtils.getJson(url, officeApiHeader()).jsonToObjectOrNull<RolesApiRes>()
         logger.info("roles $url res:{}", rolesApiRes)
         return rolesApiRes?.roles ?: emptyList()
     }
 
-    fun addRoles(token: String, guildId: String, userId: String, roleId: String): Boolean {
+    fun addRoles(guildId: String, userId: String, roleId: String): Boolean {
         val url = editRole.replace("{{guild_id}}", guildId)
             .replace("{{user_id}}", userId)
             .replace("{{role_id}}", roleId)
-        val res = OkHttpUtils.put(url, emptyMap(), officeApiHeader(token))
+        val res = OkHttpUtils.put(url, emptyMap(), officeApiHeader())
         logger.info("addRoles $url res:${res.isSuccessful}")
         return res.isSuccessful
     }
 
-    fun delRoles(token: String, guildId: String, userId: String, roleId: String): Boolean {
+    fun delRoles(guildId: String, userId: String, roleId: String): Boolean {
         val url = editRole.replace("{{guild_id}}", guildId)
             .replace("{{user_id}}", userId)
             .replace("{{role_id}}", roleId)
-        val res = OkHttpUtils.delete(url, emptyMap(), officeApiHeader(token))
+        val res = OkHttpUtils.delete(url, emptyMap(), officeApiHeader())
         logger.info("delRoles $url res:${res.isSuccessful}")
         return res.isSuccessful
     }

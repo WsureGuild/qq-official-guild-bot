@@ -4,6 +4,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class IdentifyConfig(
+    val botId: Long,
     val token: String,
     val shards: Int = 1,
     var index: Int = 0,
@@ -15,8 +16,11 @@ data class IdentifyConfig(
             intents = intents.toIntentsValue(),
             properties = properties,
             shard = mutableListOf(index, shards),
-            token = token
+            token = getBotToken()
         )
+    }
+    fun getBotToken():String{
+        return "Bot ${botId}.${token}"
     }
 }
 

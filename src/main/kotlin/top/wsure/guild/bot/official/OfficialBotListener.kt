@@ -187,7 +187,7 @@ class OfficialBotListener(
     private fun initConnection(webSocket: WebSocket){
         // 鉴权
         if(isResume.get()){
-            val resume = Resume(ResumeData(messageSeq.get(),sessionId,config.token))
+            val resume = Resume(ResumeData(messageSeq.get(),sessionId,config.getBotToken()))
             webSocket.sendAndPrintLog(resume.objectToJson())
         } else {
             webSocket.sendAndPrintLog(identifyOpDto)

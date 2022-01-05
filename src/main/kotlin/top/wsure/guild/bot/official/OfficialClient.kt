@@ -17,6 +17,7 @@ import top.wsure.guild.bot.official.dtos.event.guilds.GuildEvent
 import top.wsure.guild.bot.official.dtos.operation.*
 import top.wsure.guild.bot.official.enums.DispatchEnums
 import top.wsure.guild.bot.official.enums.OPCodeEnums
+import top.wsure.guild.bot.official.intf.OfficialBotApi
 import top.wsure.guild.bot.official.intf.OfficialBotEvent
 import top.wsure.guild.bot.utils.FileUtils
 import top.wsure.guild.bot.utils.JsonUtils.jsonToObject
@@ -46,7 +47,7 @@ class OfficialClient(
     private var hbTimer: Timer? = null
     private val messageSeq by lazy { AtomicLong(0) }
     private val lastReceivedHeartBeat = AtomicLong(0)
-    private val seqFile = Path("$seqPath${FileUtils.md5(config.token)}_${config.shards}_${config.index}").toFile()
+    private val seqFile = Path("$seqPath${FileUtils.md5(config.getBotToken())}_${config.shards}_${config.index}").toFile()
 
     init {
         Path(seqPath).toFile().mkdirs()
@@ -60,6 +61,10 @@ class OfficialClient(
             }
         } else {
             seqFile.createNewFile()
+        }
+        officialEvents.forEach {
+            it.officialBot = config
+            it.sender = OfficialBotApi(config.getBotToken())
         }
     }
 
@@ -200,7 +205,11 @@ class OfficialClient(
     }
 
     private fun onReceivedMsg(dispatchDto: DispatchType) {
-        seqFile.writeText(ResumeData(dispatchDto.seq,sessionId,config.token).objectToJson())
+        if(seqFile.exists() || seqFile.createNewFile()){
+            seqFile.writeText(ResumeData(dispatchDto.seq,sessionId,config.getBotToken()).objectToJson())
+        } else {
+            logger.error("seqFile isn't exists and can't create !! ")
+        }
         messageSeq.getAndSet(dispatchDto.seq)
     }
 
@@ -222,7 +231,7 @@ class OfficialClient(
         connected()
         // 鉴权
         if(resetSession){
-            val resume = Resume(ResumeData(messageSeq.get(),sessionId,config.token))
+            val resume = Resume(ResumeData(messageSeq.get(),sessionId,config.getBotToken()))
             webSocket.sendAndPrintLog(resume.objectToJson())
         } else {
             webSocket.sendAndPrintLog(identifyOpDto)

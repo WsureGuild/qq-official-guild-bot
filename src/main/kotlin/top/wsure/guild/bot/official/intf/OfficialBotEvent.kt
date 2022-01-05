@@ -9,6 +9,11 @@ import top.wsure.guild.bot.official.dtos.event.guilds.GuildEvent
 import top.wsure.guild.bot.official.dtos.operation.IdentifyConfig
 
 abstract class OfficialBotEvent {
+
+    lateinit var officialBot :IdentifyConfig
+
+    lateinit var sender:OfficialBotApi
+
     open suspend fun onReady(data: ReadyEvent) {}
 
     open suspend fun onGuildMemberAdd(data: GuildMemberEvent) {}
