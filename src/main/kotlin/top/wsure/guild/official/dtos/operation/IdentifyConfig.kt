@@ -30,7 +30,7 @@ data class Intents(
     val guildMembers: Boolean = true,
     val messageCreate : Boolean = true,
     val guildMessageReactions : Boolean = true,
-    val directMessage: Boolean = false,
+    val directMessage: Boolean = true,
     val forumEvent : Boolean = false,
     val audioAction: Boolean = true,
     val atMessages: Boolean = true,

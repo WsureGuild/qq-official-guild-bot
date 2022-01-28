@@ -14,6 +14,8 @@ enum class DispatchEnums {
     CHANNEL_DELETE,
     MESSAGE_CREATE,         //  私域bot message
     AT_MESSAGE_CREATE,
+    MESSAGE_REACTION_ADD,
+    MESSAGE_REACTION_REMOVE,
     DIRECT_MESSAGE_CREATE,
     AUDIO_START,           // 音频开始播放时
     AUDIO_FINISH,          // 音频播放结束时

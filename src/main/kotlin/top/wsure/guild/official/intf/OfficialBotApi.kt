@@ -2,6 +2,7 @@ package top.wsure.guild.official.intf
 
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import top.wsure.guild.common.sender.Sender
 import top.wsure.guild.official.dtos.api.Role
 import top.wsure.guild.official.dtos.api.RolesApiRes
 import top.wsure.guild.official.dtos.api.TextMessage
@@ -9,7 +10,7 @@ import top.wsure.guild.common.utils.JsonUtils.jsonToObjectOrNull
 import top.wsure.guild.common.utils.JsonUtils.objectToJson
 import top.wsure.guild.common.utils.OkHttpUtils
 
-class OfficialBotApi(private val token: String) {
+class OfficialBotApi(private val token: String): Sender {
     private val logger: Logger = LoggerFactory.getLogger(javaClass)
 
     private val roles = "https://api.sgroup.qq.com/guilds/{{guild_id}}/roles"

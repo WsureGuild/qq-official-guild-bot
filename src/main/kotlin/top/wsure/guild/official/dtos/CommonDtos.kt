@@ -8,7 +8,9 @@ import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
+import top.wsure.guild.official.enums.ReactionTargetEnums
 import java.time.LocalDateTime
+import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 
 
@@ -37,21 +39,30 @@ data class Author(
 @Serializable
 data class Member(
     @SerialName("joined_at")
-    @Serializable( with = LocalDateTimeSerializer::class )
-    val joinedAt: LocalDateTime,
+    @Serializable( with = ZoneDateTimeSerializer::class )
+    val joinedAt: ZonedDateTime,
     @SerialName("roles")
     val roles: List<String>
 )
 
-object LocalDateTimeSerializer : KSerializer<LocalDateTime> {
+@Serializable
+data class ReactionTarget(
+    @SerialName("id")
+    val id: String? = null,
+    @SerialName("type")
+    @Serializable(with = ReactionTargetEnums.ReactionTargetEnumsSerializer::class)
+    val type: ReactionTargetEnums? = null
+)
+
+object ZoneDateTimeSerializer : KSerializer<ZonedDateTime> {
     val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssXXX")
-    override fun deserialize(decoder: Decoder): LocalDateTime {
-        return LocalDateTime.parse(decoder.decodeString(), formatter)
+    override fun deserialize(decoder: Decoder): ZonedDateTime {
+        return ZonedDateTime.parse(decoder.decodeString(), formatter)
     }
 
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("localDateTime", PrimitiveKind.STRING)
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("zonedDateTime", PrimitiveKind.STRING)
 
-    override fun serialize(encoder: Encoder, value: LocalDateTime) {
+    override fun serialize(encoder: Encoder, value: ZonedDateTime) {
         encoder.encodeString(value.format(formatter))
     }
 }

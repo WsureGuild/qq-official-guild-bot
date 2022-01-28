@@ -7,8 +7,6 @@ import okhttp3.Response
 import okhttp3.WebSocket
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import top.wsure.guild.official.dtos.event.AtMessageCreateEvent
-import top.wsure.guild.official.dtos.event.MessageCreate
 import top.wsure.guild.official.dtos.event.ReadyEvent
 import top.wsure.guild.official.dtos.event.channel.ChannelEvent
 import top.wsure.guild.official.dtos.event.guild.member.GuildMemberEvent
@@ -24,6 +22,8 @@ import top.wsure.guild.common.utils.JsonUtils.jsonToObject
 import top.wsure.guild.common.utils.JsonUtils.jsonToObjectOrNull
 import top.wsure.guild.common.utils.JsonUtils.objectToJson
 import top.wsure.guild.common.utils.ScheduleUtils
+import top.wsure.guild.official.dtos.Message
+import top.wsure.guild.official.dtos.event.reactions.MessageReactionEvent
 import java.util.*
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.io.path.Path
@@ -41,7 +41,6 @@ class OfficialClient(
 
     private val identifyOpDto = IdentifyOperation(config.toIdentifyOperationData()).objectToJson()
     var sessionId :String = ""
-    var resetSession :Boolean = false
     private val logHeader = "${config.index} of ${config.shards}"
 
     private var hbTimer: Timer? = null
@@ -50,8 +49,10 @@ class OfficialClient(
     private val seqFile = Path("$seqPath${FileUtils.md5(config.getBotToken())}_${config.shards}_${config.index}").toFile()
 
     init {
+        logger.info("seqFile:${seqFile.absolutePath}, exists:${seqFile.exists()}")
         Path(seqPath).toFile().mkdirs()
         if(seqFile.exists()){
+            logger.info(" try to load seqFile")
             try {
                 val cacheResumeData = seqFile.readText().jsonToObject<ResumeData>()
                 messageSeq.getAndSet(cacheResumeData.seq)
@@ -60,6 +61,7 @@ class OfficialClient(
                 logger.warn("read seqFile fail",e)
             }
         } else {
+            logger.info("create new seqFile")
             seqFile.createNewFile()
         }
         officialEvents.forEach {
@@ -97,7 +99,6 @@ class OfficialClient(
                                 DispatchEnums.READY -> {
                                     text.jsonToObjectOrNull<Dispatch<ReadyEvent>>()?.also { readyEvent ->
                                         sessionId = readyEvent.d.sessionId
-                                        resetSession = false
                                         GlobalScope.launch { officialEvents.forEach {
                                             it.onReady(readyEvent.d)
                                         } }
@@ -125,12 +126,12 @@ class OfficialClient(
                                     }
                                 }
                                 DispatchEnums.AT_MESSAGE_CREATE -> {
-                                    text.jsonToObjectOrNull<Dispatch<AtMessageCreateEvent>>()?.also { guildAtMessage ->
+                                    text.jsonToObjectOrNull<Dispatch<Message>>()?.also { guildAtMessage ->
                                         GlobalScope.launch { officialEvents.forEach { it.onAtMessageCreate(guildAtMessage.d) } }
                                     }
                                 }
                                 DispatchEnums.MESSAGE_CREATE -> {
-                                    text.jsonToObjectOrNull<Dispatch<MessageCreate>>()?.also { messageCreate ->
+                                    text.jsonToObjectOrNull<Dispatch<Message>>()?.also { messageCreate ->
                                         GlobalScope.launch { officialEvents.forEach { it.onMessageCreate(messageCreate.d) } }
                                     }
                                 }
@@ -164,6 +165,22 @@ class OfficialClient(
                                         GlobalScope.launch { officialEvents.forEach{ it.onGuildDelete(guildEvent.d) } }
                                     }
                                 }
+                                DispatchEnums.MESSAGE_REACTION_ADD ->{
+                                    text.jsonToObjectOrNull<Dispatch<MessageReactionEvent>>()?.also { messageReactionEvent ->
+                                        GlobalScope.launch { officialEvents.forEach{ it.onMessageReactionAdd(messageReactionEvent.d) } }
+                                    }
+                                }
+                                DispatchEnums.MESSAGE_REACTION_REMOVE ->{
+                                    text.jsonToObjectOrNull<Dispatch<MessageReactionEvent>>()?.also { messageReactionEvent ->
+                                        GlobalScope.launch { officialEvents.forEach{ it.onMessageReactionRemove(messageReactionEvent.d) } }
+                                    }
+                                }
+                                DispatchEnums.DIRECT_MESSAGE_CREATE ->{
+                                    text.jsonToObjectOrNull<Dispatch<Message>>()?.also { message ->
+                                        GlobalScope.launch { officialEvents.forEach{ it.onDirectMessageCreate(message.d) } }
+                                    }
+                                }
+
                                 DispatchEnums.RESUMED -> {
                                     GlobalScope.launch { officialEvents.forEach { it.onResumed(config,sessionId) } }
                                 }
@@ -194,8 +211,8 @@ class OfficialClient(
     }
 
     private fun failureConnect() {
-        if(!resetSession){
-            resetSession = true
+        if(sessionId.isNotBlank()){
+            sessionId = ""
             reconnectClient()
         } else {
             disconnect()
@@ -230,7 +247,7 @@ class OfficialClient(
     private fun initConnection(webSocket: WebSocket){
         connected()
         // 鉴权
-        if(resetSession){
+        if(sessionId.isNotBlank()){
             val resume = Resume(ResumeData(messageSeq.get(),sessionId,config.getBotToken()))
             webSocket.sendAndPrintLog(resume.objectToJson())
         } else {
